@@ -3,6 +3,7 @@ package com.att.tdp.issueflow.controller;
 import com.att.tdp.issueflow.dto.request.CreateUserRequest;
 import com.att.tdp.issueflow.dto.request.UpdateUserRequest;
 import com.att.tdp.issueflow.dto.response.UserResponse;
+import com.att.tdp.issueflow.security.SecurityUtils;
 import com.att.tdp.issueflow.service.UserService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -37,19 +38,19 @@ public class UserController {
 
 	@PostMapping
 	public UserResponse createUser(@Valid @RequestBody CreateUserRequest request) {
-		return userService.createUser(request, null);
+		return userService.createUser(request, SecurityUtils.getCurrentUserId());
 	}
 
 	@PostMapping("/update/{userId}")
 	public ResponseEntity<Void> updateUser(
 			@PathVariable Long userId, @Valid @RequestBody UpdateUserRequest request) {
-		userService.updateUser(userId, request, null);
+		userService.updateUser(userId, request, SecurityUtils.getCurrentUserId());
 		return ResponseEntity.ok().build();
 	}
 
 	@DeleteMapping("/{userId}")
 	public ResponseEntity<Void> deleteUser(@PathVariable Long userId) {
-		userService.deleteUser(userId, null);
+		userService.deleteUser(userId, SecurityUtils.getCurrentUserId());
 		return ResponseEntity.ok().build();
 	}
 }

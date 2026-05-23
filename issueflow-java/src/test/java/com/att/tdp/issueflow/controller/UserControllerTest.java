@@ -12,21 +12,23 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.att.tdp.issueflow.controller.support.SecuredControllerTestBase;
 import com.att.tdp.issueflow.dto.response.UserResponse;
 import com.att.tdp.issueflow.model.enums.Role;
 import com.att.tdp.issueflow.service.UserService;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-@WebMvcTest(UserController.class)
+@WebMvcTest(value = UserController.class, excludeAutoConfiguration = SecurityAutoConfiguration.class)
 @AutoConfigureMockMvc(addFilters = false)
-class UserControllerTest {
+class UserControllerTest extends SecuredControllerTestBase {
 
 	@Autowired
 	private MockMvc mockMvc;
@@ -46,7 +48,7 @@ class UserControllerTest {
 
 	@Test
 	void createUser_returnsCreatedUser() throws Exception {
-		when(userService.createUser(any(), eq(null))).thenReturn(sampleUser());
+		when(userService.createUser(any(), eq(1L))).thenReturn(sampleUser());
 
 		mockMvc.perform(
 						post("/users")
@@ -64,12 +66,12 @@ class UserControllerTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.id").value(1));
 
-		verify(userService).createUser(any(), eq(null));
+		verify(userService).createUser(any(), eq(1L));
 	}
 
 	@Test
 	void updateUser_usesReadmePathAndEmptyBody() throws Exception {
-		doNothing().when(userService).updateUser(eq(1L), any(), eq(null));
+		doNothing().when(userService).updateUser(eq(1L), any(), eq(1L));
 
 		mockMvc.perform(
 						post("/users/update/1")
@@ -84,18 +86,18 @@ class UserControllerTest {
 				.andExpect(status().isOk())
 				.andExpect(content().string(""));
 
-		verify(userService).updateUser(eq(1L), any(), eq(null));
+		verify(userService).updateUser(eq(1L), any(), eq(1L));
 	}
 
 	@Test
 	void deleteUser_returnsOk() throws Exception {
-		doNothing().when(userService).deleteUser(eq(1L), eq(null));
+		doNothing().when(userService).deleteUser(eq(1L), eq(1L));
 
 		mockMvc.perform(delete("/users/1"))
 				.andExpect(status().isOk())
 				.andExpect(content().string(""));
 
-		verify(userService).deleteUser(eq(1L), eq(null));
+		verify(userService).deleteUser(eq(1L), eq(1L));
 	}
 
 	private UserResponse sampleUser() {
