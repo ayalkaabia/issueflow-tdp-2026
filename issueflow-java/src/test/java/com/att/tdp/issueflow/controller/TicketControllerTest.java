@@ -1,0 +1,133 @@
+package com.att.tdp.issueflow.controller;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.att.tdp.issueflow.controller.support.SecuredControllerTestBase;
+import com.att.tdp.issueflow.dto.response.TicketResponse;
+import com.att.tdp.issueflow.model.enums.TicketPriority;
+import com.att.tdp.issueflow.model.enums.TicketStatus;
+import com.att.tdp.issueflow.model.enums.TicketType;
+import com.att.tdp.issueflow.service.TicketService;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+@AutoConfigureMockMvc(addFilters = false)
+@WebMvcTest(value = TicketController.class, excludeAutoConfiguration = SecurityAutoConfiguration.class)
+class TicketControllerTest extends SecuredControllerTestBase {
+
+	@Autowired
+	private MockMvc mockMvc;
+
+	@MockitoBean
+	private TicketService ticketService;
+
+	@Test
+	void getTicketsByProject_returnsList() throws Exception {
+		TicketResponse ticket = sampleResponse();
+		when(ticketService.getTicketsByProject(1L)).thenReturn(List.of(ticket));
+
+		mockMvc.perform(get("/tickets").param("projectId", "1"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$[0].id").value(1))
+				.andExpect(jsonPath("$[0].isOverdue").value(false));
+
+		verify(ticketService).getTicketsByProject(1L);
+	}
+
+	@Test
+	void getTicketById_returnsTicket() throws Exception {
+		when(ticketService.getTicketById(1L)).thenReturn(sampleResponse());
+
+		mockMvc.perform(get("/tickets/1"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.id").value(1));
+
+		verify(ticketService).getTicketById(1L);
+	}
+
+	@Test
+	void createTicket_returnsCreatedTicket() throws Exception {
+		when(ticketService.createTicket(any(), eq(1L))).thenReturn(sampleResponse());
+
+		mockMvc.perform(
+						post("/tickets")
+								.contentType(MediaType.APPLICATION_JSON)
+								.content(
+										"""
+										{
+										  "title": "Fix login bug",
+										  "priority": "HIGH",
+										  "type": "BUG",
+										  "projectId": 1
+										}
+										"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.title").value("Fix login bug"))
+				.andExpect(jsonPath("$.status").value("TODO"));
+
+		verify(ticketService).createTicket(any(), eq(1L));
+	}
+
+	@Test
+	void updateTicket_requiresVersion() throws Exception {
+		mockMvc.perform(
+						patch("/tickets/1")
+								.contentType(MediaType.APPLICATION_JSON)
+								.content(
+										"""
+										{
+										  "status": "IN_PROGRESS"
+										}
+										"""))
+				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void updateTicket_acceptsPatchWithVersion() throws Exception {
+		when(ticketService.updateTicket(eq(1L), any(), eq(1L))).thenReturn(sampleResponse());
+
+		mockMvc.perform(
+						patch("/tickets/1")
+								.contentType(MediaType.APPLICATION_JSON)
+								.content(
+										"""
+										{
+										  "status": "IN_PROGRESS",
+										  "version": 0
+										}
+										"""))
+				.andExpect(status().isOk());
+
+		verify(ticketService).updateTicket(eq(1L), any(), eq(1L));
+	}
+
+	private TicketResponse sampleResponse() {
+		return TicketResponse.builder()
+				.id(1L)
+				.title("Fix login bug")
+				.description("...")
+				.status(TicketStatus.TODO)
+				.priority(TicketPriority.HIGH)
+				.type(TicketType.BUG)
+				.projectId(1L)
+				.assigneeId(2L)
+				.overdue(false)
+				.version(0L)
+				.build();
+	}
+}
