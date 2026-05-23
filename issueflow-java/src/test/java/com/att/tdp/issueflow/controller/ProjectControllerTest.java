@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.att.tdp.issueflow.controller.support.SecuredControllerTestBase;
 import com.att.tdp.issueflow.dto.response.ProjectResponse;
+import com.att.tdp.issueflow.dto.response.WorkloadResponse;
 import com.att.tdp.issueflow.service.ProjectService;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -90,6 +91,23 @@ class ProjectControllerTest extends SecuredControllerTestBase {
 		mockMvc.perform(delete("/projects/1")).andExpect(status().isOk());
 
 		verify(projectService).softDeleteProject(eq(1L), eq(1L));
+	}
+
+	@Test
+	void getProjectWorkload_usesCorrectPath() throws Exception {
+		WorkloadResponse workload = WorkloadResponse.builder()
+				.userId(1L)
+				.username("jdoe")
+				.openTicketCount(3L)
+				.build();
+		when(projectService.getProjectWorkload(1L)).thenReturn(List.of(workload));
+
+		mockMvc.perform(get("/projects/1/workload"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$[0].username").value("jdoe"))
+				.andExpect(jsonPath("$[0].openTicketCount").value(3));
+
+		verify(projectService).getProjectWorkload(1L);
 	}
 
 	@Test

@@ -3,6 +3,7 @@ package com.att.tdp.issueflow.controller;
 import com.att.tdp.issueflow.dto.request.CreateProjectRequest;
 import com.att.tdp.issueflow.dto.request.UpdateProjectRequest;
 import com.att.tdp.issueflow.dto.response.ProjectResponse;
+import com.att.tdp.issueflow.dto.response.WorkloadResponse;
 import com.att.tdp.issueflow.security.SecurityUtils;
 import com.att.tdp.issueflow.service.ProjectService;
 import jakarta.validation.Valid;
@@ -40,6 +41,11 @@ public class ProjectController {
 	@GetMapping("/{projectId}")
 	public ProjectResponse getProjectById(@PathVariable Long projectId) {
 		return projectService.getProjectById(projectId);
+	}
+
+	@GetMapping("/{projectId}/workload")
+	public List<WorkloadResponse> getProjectWorkload(@PathVariable Long projectId) {
+		return projectService.getProjectWorkload(projectId);
 	}
 
 	@PostMapping

@@ -3,6 +3,7 @@ package com.att.tdp.issueflow.service;
 import com.att.tdp.issueflow.dto.request.CreateProjectRequest;
 import com.att.tdp.issueflow.dto.request.UpdateProjectRequest;
 import com.att.tdp.issueflow.dto.response.ProjectResponse;
+import com.att.tdp.issueflow.dto.response.WorkloadResponse;
 import com.att.tdp.issueflow.exception.BusinessRuleException;
 import com.att.tdp.issueflow.exception.ResourceNotFoundException;
 import com.att.tdp.issueflow.mapper.ProjectMapper;
@@ -11,10 +12,15 @@ import com.att.tdp.issueflow.model.enums.AuditAction;
 import com.att.tdp.issueflow.model.enums.AuditActor;
 import com.att.tdp.issueflow.model.enums.AuditEntityType;
 import com.att.tdp.issueflow.model.enums.Role;
+import com.att.tdp.issueflow.model.enums.TicketStatus;
 import com.att.tdp.issueflow.repository.ProjectRepository;
+import com.att.tdp.issueflow.repository.TicketRepository;
 import com.att.tdp.issueflow.repository.UserRepository;
 import java.time.Instant;
+import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,8 +30,12 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class ProjectService {
 
+	private static final Set<TicketStatus> OPEN_STATUSES =
+			EnumSet.of(TicketStatus.TODO, TicketStatus.IN_PROGRESS, TicketStatus.IN_REVIEW);
+
 	private final ProjectRepository projectRepository;
 	private final UserRepository userRepository;
+	private final TicketRepository ticketRepository;
 	private final AuditService auditService;
 
 	@Transactional(readOnly = true)
@@ -38,6 +48,22 @@ public class ProjectService {
 	@Transactional(readOnly = true)
 	public ProjectResponse getProjectById(Long projectId) {
 		return ProjectMapper.toResponse(requireActiveProject(projectId));
+	}
+
+	@Transactional(readOnly = true)
+	public List<WorkloadResponse> getProjectWorkload(Long projectId) {
+		requireActiveProject(projectId);
+
+		return userRepository.findByRole(Role.DEVELOPER).stream()
+				.map(developer -> WorkloadResponse.builder()
+						.userId(developer.getId())
+						.username(developer.getUsername())
+						.openTicketCount(ticketRepository.countByProjectIdAndAssigneeIdAndDeletedAtIsNullAndStatusIn(
+								projectId, developer.getId(), OPEN_STATUSES))
+						.build())
+				.sorted(Comparator.comparingLong(WorkloadResponse::getOpenTicketCount)
+						.thenComparing(WorkloadResponse::getUsername))
+				.toList();
 	}
 
 	@Transactional
