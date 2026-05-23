@@ -2,8 +2,10 @@ package com.att.tdp.issueflow.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -95,6 +97,35 @@ class TicketControllerTest extends SecuredControllerTestBase {
 										}
 										"""))
 				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void getDeletedTickets_usesCorrectPath() throws Exception {
+		when(ticketService.getDeletedTickets(1L, 1L)).thenReturn(List.of(sampleResponse()));
+
+		mockMvc.perform(get("/tickets/deleted").param("projectId", "1"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$[0].id").value(1));
+
+		verify(ticketService).getDeletedTickets(1L, 1L);
+	}
+
+	@Test
+	void restoreTicket_usesCorrectPath() throws Exception {
+		when(ticketService.restoreTicket(1L, 1L)).thenReturn(sampleResponse());
+
+		mockMvc.perform(post("/tickets/1/restore")).andExpect(status().isOk());
+
+		verify(ticketService).restoreTicket(1L, 1L);
+	}
+
+	@Test
+	void softDeleteTicket_returnsOk() throws Exception {
+		doNothing().when(ticketService).softDeleteTicket(1L, 1L);
+
+		mockMvc.perform(delete("/tickets/1")).andExpect(status().isOk());
+
+		verify(ticketService).softDeleteTicket(1L, 1L);
 	}
 
 	@Test

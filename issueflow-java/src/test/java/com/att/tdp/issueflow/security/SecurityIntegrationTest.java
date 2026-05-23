@@ -5,8 +5,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.att.tdp.issueflow.model.entity.Project;
 import com.att.tdp.issueflow.model.entity.User;
 import com.att.tdp.issueflow.model.enums.Role;
+import com.att.tdp.issueflow.repository.ProjectRepository;
 import com.att.tdp.issueflow.repository.RevokedJwtTokenRepository;
 import com.att.tdp.issueflow.repository.UserRepository;
 import com.att.tdp.issueflow.support.TestPasswords;
@@ -31,14 +33,25 @@ class SecurityIntegrationTest {
 	private UserRepository userRepository;
 
 	@Autowired
+	private ProjectRepository projectRepository;
+
+	@Autowired
 	private RevokedJwtTokenRepository revokedJwtTokenRepository;
+
+	private Long projectId;
 
 	@BeforeEach
 	void setUp() {
 		revokedJwtTokenRepository.deleteAll();
+		projectRepository.deleteAll();
 		userRepository.deleteAll();
-		saveUser("admin", Role.ADMIN);
+		Long adminId = saveUser("admin", Role.ADMIN);
 		saveUser("dev", Role.DEVELOPER);
+
+		Project project = new Project();
+		project.setName("Security Test");
+		project.setOwnerId(adminId);
+		projectId = projectRepository.save(project).getId();
 	}
 
 	@Test
@@ -67,6 +80,26 @@ class SecurityIntegrationTest {
 		String token = login("admin");
 
 		mockMvc.perform(get("/projects/deleted").header("Authorization", "Bearer " + token))
+				.andExpect(status().isOk());
+	}
+
+	@Test
+	void ticketDeletedEndpoint_forbidsDeveloper() throws Exception {
+		String token = login("dev");
+
+		mockMvc.perform(get("/tickets/deleted")
+						.param("projectId", projectId.toString())
+						.header("Authorization", "Bearer " + token))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	void ticketDeletedEndpoint_allowsAdmin() throws Exception {
+		String token = login("admin");
+
+		mockMvc.perform(get("/tickets/deleted")
+						.param("projectId", projectId.toString())
+						.header("Authorization", "Bearer " + token))
 				.andExpect(status().isOk());
 	}
 
@@ -130,13 +163,13 @@ class SecurityIntegrationTest {
 		return response.substring(start, end);
 	}
 
-	private void saveUser(String username, Role role) {
+	private Long saveUser(String username, Role role) {
 		User user = new User();
 		user.setUsername(username);
 		user.setEmail(username + "@example.com");
 		user.setFullName(username);
 		user.setRole(role);
 		user.setPasswordHash(TestPasswords.encoded());
-		userRepository.save(user);
+		return userRepository.save(user).getId();
 	}
 }

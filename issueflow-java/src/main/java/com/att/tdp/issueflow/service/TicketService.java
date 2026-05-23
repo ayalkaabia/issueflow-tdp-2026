@@ -101,6 +101,49 @@ public class TicketService {
 				.toList();
 	}
 
+	@Transactional(readOnly = true)
+	public List<TicketResponse> getDeletedTickets(Long projectId, Long performedBy) {
+		requireAdmin(performedBy);
+		requireActiveProject(projectId);
+		return ticketRepository.findByProjectIdAndDeletedAtIsNotNull(projectId).stream()
+				.map(TicketMapper::toResponse)
+				.toList();
+	}
+
+	@Transactional
+	public void softDeleteTicket(Long ticketId, Long performedBy) {
+		Ticket ticket = requireActiveTicket(ticketId);
+		ticket.setDeletedAt(Instant.now());
+		try {
+			ticketRepository.save(ticket);
+			auditService.log(
+					AuditAction.DELETE, AuditEntityType.TICKET, ticketId, performedBy, AuditActor.USER);
+		} catch (OptimisticLockingFailureException ex) {
+			throw new OptimisticLockConflictException(
+					"Ticket was modified by another user; refresh and retry", ex);
+		}
+	}
+
+	@Transactional
+	public TicketResponse restoreTicket(Long ticketId, Long performedBy) {
+		requireAdmin(performedBy);
+
+		Ticket ticket = ticketRepository
+				.findByIdAndDeletedAtIsNotNull(ticketId)
+				.orElseThrow(() -> new ResourceNotFoundException("Deleted ticket not found: " + ticketId));
+
+		ticket.setDeletedAt(null);
+		try {
+			Ticket saved = ticketRepository.save(ticket);
+			auditService.log(
+					AuditAction.RESTORE, AuditEntityType.TICKET, saved.getId(), performedBy, AuditActor.USER);
+			return TicketMapper.toResponse(saved);
+		} catch (OptimisticLockingFailureException ex) {
+			throw new OptimisticLockConflictException(
+					"Ticket was modified by another user; refresh and retry", ex);
+		}
+	}
+
 	@Transactional
 	public TicketResponse updateTicket(Long ticketId, UpdateTicketRequest request, Long performedBy) {
 		Ticket ticket = requireActiveTicket(ticketId);
@@ -197,5 +240,14 @@ public class TicketService {
 		userRepository
 				.findById(userId)
 				.orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+	}
+
+	private void requireAdmin(Long performedBy) {
+		User user = userRepository
+				.findById(performedBy)
+				.orElseThrow(() -> new ResourceNotFoundException("User not found: " + performedBy));
+		if (user.getRole() != Role.ADMIN) {
+			throw new BusinessRuleException("Only ADMIN users can access deleted tickets or restore them");
+		}
 	}
 }

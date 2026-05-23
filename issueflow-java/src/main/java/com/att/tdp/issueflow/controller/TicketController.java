@@ -9,7 +9,9 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -32,6 +34,11 @@ public class TicketController {
 		return ticketService.getTicketsByProject(projectId);
 	}
 
+	@GetMapping("/deleted")
+	public List<TicketResponse> getDeletedTickets(@RequestParam @NotNull Long projectId) {
+		return ticketService.getDeletedTickets(projectId, SecurityUtils.getCurrentUserId());
+	}
+
 	@GetMapping("/{ticketId}")
 	public TicketResponse getTicketById(@PathVariable Long ticketId) {
 		return ticketService.getTicketById(ticketId);
@@ -46,5 +53,16 @@ public class TicketController {
 	public TicketResponse updateTicket(
 			@PathVariable Long ticketId, @Valid @RequestBody UpdateTicketRequest request) {
 		return ticketService.updateTicket(ticketId, request, SecurityUtils.getCurrentUserId());
+	}
+
+	@DeleteMapping("/{ticketId}")
+	public ResponseEntity<Void> softDeleteTicket(@PathVariable Long ticketId) {
+		ticketService.softDeleteTicket(ticketId, SecurityUtils.getCurrentUserId());
+		return ResponseEntity.ok().build();
+	}
+
+	@PostMapping("/{ticketId}/restore")
+	public TicketResponse restoreTicket(@PathVariable Long ticketId) {
+		return ticketService.restoreTicket(ticketId, SecurityUtils.getCurrentUserId());
 	}
 }
