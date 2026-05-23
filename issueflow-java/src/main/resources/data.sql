@@ -1,3 +1,1 @@
-INSERT INTO task ( description, completed) VALUES
-                                               ( 'description1', 'completed'),
-                                               ('description2', 'completed');
+-- Seed data can be added here if needed; default bootstrap uses JPA only.

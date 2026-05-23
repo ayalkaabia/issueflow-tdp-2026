@@ -3,24 +3,16 @@ server:
 
 spring:
   application:
-    name: issueflow
+    name: issueflow-test
   datasource:
-    url: jdbc:h2:mem:db;MODE=PostgreSQL;DB_CLOSE_ON_EXIT=FALSE
+    url: jdbc:h2:mem:issueflow-test;MODE=PostgreSQL;DB_CLOSE_ON_EXIT=FALSE
     username: sa
     password: password
-    driverClassName: org.h2.Driver
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
   sql:
     init:
-      platform: mssql
-  h2:
-    console:
-      enabled: true
-  jpa:
-    database: POSTGRESQL
-    show-sql: true
-    hibernate:
-      ddl-auto: update
-  servlet:
-    multipart:
-      max-file-size: 10MB
-      max-request-size: 10MB
+      mode: never
