@@ -13,8 +13,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.att.tdp.issueflow.controller.support.SecuredControllerTestBase;
+import com.att.tdp.issueflow.dto.response.CommentResponse;
+import com.att.tdp.issueflow.dto.response.MentionPageResponse;
+import com.att.tdp.issueflow.dto.response.MentionedUserResponse;
 import com.att.tdp.issueflow.dto.response.UserResponse;
 import com.att.tdp.issueflow.model.enums.Role;
+import com.att.tdp.issueflow.service.MentionService;
 import com.att.tdp.issueflow.service.UserService;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -35,6 +39,9 @@ class UserControllerTest extends SecuredControllerTestBase {
 
 	@MockitoBean
 	private UserService userService;
+
+	@MockitoBean
+	private MentionService mentionService;
 
 	@Test
 	void getAllUsers_returnsList() throws Exception {
@@ -67,6 +74,35 @@ class UserControllerTest extends SecuredControllerTestBase {
 				.andExpect(jsonPath("$.id").value(1));
 
 		verify(userService).createUser(any(), eq(1L));
+	}
+
+	@Test
+	void getMentionsForUser_returnsPagedComments() throws Exception {
+		MentionPageResponse page = MentionPageResponse.builder()
+				.data(List.of(CommentResponse.builder()
+						.id(1L)
+						.ticketId(3L)
+						.authorId(2L)
+						.content("Hey @jdoe")
+						.version(0L)
+						.mentionedUsers(List.of(MentionedUserResponse.builder()
+								.id(1L)
+								.username("jdoe")
+								.fullName("John Doe")
+								.build()))
+						.build()))
+				.total(10)
+				.page(1)
+				.build();
+		when(mentionService.getMentionsForUser(1L, 1, 10)).thenReturn(page);
+
+		mockMvc.perform(get("/users/1/mentions?page=1&pageSize=10"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.total").value(10))
+				.andExpect(jsonPath("$.page").value(1))
+				.andExpect(jsonPath("$.data[0].mentionedUsers[0].username").value("jdoe"));
+
+		verify(mentionService).getMentionsForUser(1L, 1, 10);
 	}
 
 	@Test

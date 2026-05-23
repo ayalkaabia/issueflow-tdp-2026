@@ -2,8 +2,10 @@ package com.att.tdp.issueflow.controller;
 
 import com.att.tdp.issueflow.dto.request.CreateUserRequest;
 import com.att.tdp.issueflow.dto.request.UpdateUserRequest;
+import com.att.tdp.issueflow.dto.response.MentionPageResponse;
 import com.att.tdp.issueflow.dto.response.UserResponse;
 import com.att.tdp.issueflow.security.SecurityUtils;
+import com.att.tdp.issueflow.service.MentionService;
 import com.att.tdp.issueflow.service.UserService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -25,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
 	private final UserService userService;
+	private final MentionService mentionService;
 
 	@GetMapping
 	public List<UserResponse> getAllUsers() {
@@ -34,6 +38,14 @@ public class UserController {
 	@GetMapping("/{userId}")
 	public UserResponse getUserById(@PathVariable Long userId) {
 		return userService.getUserById(userId);
+	}
+
+	@GetMapping("/{userId}/mentions")
+	public MentionPageResponse getMentionsForUser(
+			@PathVariable Long userId,
+			@RequestParam(required = false) Integer page,
+			@RequestParam(required = false) Integer pageSize) {
+		return mentionService.getMentionsForUser(userId, page, pageSize);
 	}
 
 	@PostMapping
