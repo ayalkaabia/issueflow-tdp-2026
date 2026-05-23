@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.att.tdp.issueflow.controller.support.SecuredControllerTestBase;
+import com.att.tdp.issueflow.dto.response.TicketImportResponse;
 import com.att.tdp.issueflow.dto.response.TicketResponse;
 import com.att.tdp.issueflow.model.enums.TicketPriority;
 import com.att.tdp.issueflow.model.enums.TicketStatus;
@@ -53,6 +54,32 @@ class TicketControllerTest extends SecuredControllerTestBase {
 								.string("Content-Disposition", "attachment; filename=\"tickets-1.csv\""));
 
 		verify(ticketCsvService).exportTickets(1L);
+	}
+
+	@Test
+	void importTickets_returnsSummary() throws Exception {
+		TicketImportResponse summary = TicketImportResponse.builder()
+				.created(2)
+				.failed(1)
+				.errors(List.of("Row 3: bad"))
+				.build();
+		when(ticketCsvService.importTickets(eq(1L), org.mockito.ArgumentMatchers.any(), eq(1L)))
+				.thenReturn(summary);
+
+		mockMvc.perform(
+						org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart(
+										"/tickets/import")
+								.file(new org.springframework.mock.web.MockMultipartFile(
+										"file",
+										"tickets.csv",
+										"text/csv",
+										"title,priority,type\nA,MEDIUM,TECHNICAL".getBytes()))
+								.param("projectId", "1"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.created").value(2))
+				.andExpect(jsonPath("$.failed").value(1));
+
+		verify(ticketCsvService).importTickets(eq(1L), org.mockito.ArgumentMatchers.any(), eq(1L));
 	}
 
 	@Test

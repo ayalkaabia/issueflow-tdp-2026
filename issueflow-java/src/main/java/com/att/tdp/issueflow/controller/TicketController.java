@@ -2,6 +2,7 @@ package com.att.tdp.issueflow.controller;
 
 import com.att.tdp.issueflow.dto.request.CreateTicketRequest;
 import com.att.tdp.issueflow.dto.request.UpdateTicketRequest;
+import com.att.tdp.issueflow.dto.response.TicketImportResponse;
 import com.att.tdp.issueflow.dto.response.TicketResponse;
 import com.att.tdp.issueflow.security.SecurityUtils;
 import com.att.tdp.issueflow.service.TicketCsvService;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/tickets")
@@ -40,6 +42,12 @@ public class TicketController {
 				.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"tickets-" + projectId + ".csv\"")
 				.contentType(MediaType.parseMediaType("text/csv"))
 				.body(csv);
+	}
+
+	@PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	public TicketImportResponse importTickets(
+			@RequestParam("file") MultipartFile file, @RequestParam @NotNull Long projectId) {
+		return ticketCsvService.importTickets(projectId, file, SecurityUtils.getCurrentUserId());
 	}
 
 	@GetMapping

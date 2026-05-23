@@ -3,6 +3,7 @@ package com.att.tdp.issueflow.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.att.tdp.issueflow.exception.BusinessRuleException;
 import com.att.tdp.issueflow.exception.ResourceNotFoundException;
 import com.att.tdp.issueflow.model.entity.Project;
 import com.att.tdp.issueflow.model.entity.Ticket;
@@ -21,11 +22,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
 @Transactional
-class TicketCsvExportServiceTest {
+class TicketCsvServiceTest {
 
 	@Autowired
 	private TicketCsvService ticketCsvService;
@@ -42,6 +44,7 @@ class TicketCsvExportServiceTest {
 	private Long projectId;
 	private Long otherProjectId;
 	private Long developerId;
+	private Long ownerId;
 
 	@BeforeEach
 	void setUp() {
@@ -55,7 +58,7 @@ class TicketCsvExportServiceTest {
 		owner.setFullName("Owner");
 		owner.setRole(Role.ADMIN);
 		owner.setPasswordHash(TestPasswords.encoded());
-		Long ownerId = userRepository.save(owner).getId();
+		ownerId = userRepository.save(owner).getId();
 
 		User developer = new User();
 		developer.setUsername("jdoe");
@@ -82,8 +85,7 @@ class TicketCsvExportServiceTest {
 	void exportTickets_includesHeaderAndProjectTicketsOnly() {
 		saveTicket(otherProjectId, "Other project", "X", TicketStatus.TODO, null);
 
-		byte[] csv = ticketCsvService.exportTickets(projectId);
-		String content = new String(csv, StandardCharsets.UTF_8);
+		String content = new String(ticketCsvService.exportTickets(projectId), StandardCharsets.UTF_8);
 
 		assertThat(content).startsWith("id,title,description,status,priority,type,assigneeId");
 		assertThat(content).contains("Existing");
@@ -103,29 +105,80 @@ class TicketCsvExportServiceTest {
 	}
 
 	@Test
-	void exportTickets_escapesCommasAndQuotes() {
-		saveTicket(projectId, "Fix \"login\", now", "a,b", TicketStatus.IN_PROGRESS, developerId);
+	void importTickets_createsValidRows() {
+		String csv =
+				"""
+				title,description,status,priority,type,assigneeId
+				Imported task,From CSV,TODO,HIGH,BUG,
+				Second task,,,MEDIUM,TECHNICAL,%d
+				"""
+						.formatted(developerId);
 
-		String content = new String(ticketCsvService.exportTickets(projectId), StandardCharsets.UTF_8);
+		var result = ticketCsvService.importTickets(projectId, csvFile(csv), ownerId);
 
-		assertThat(content).contains("\"Fix \"\"login\"\", now\"");
-		assertThat(content).contains("\"a,b\"");
+		assertThat(result.getCreated()).isEqualTo(2);
+		assertThat(result.getFailed()).isZero();
+		assertThat(ticketRepository.findByProjectIdAndDeletedAtIsNull(projectId)).hasSize(3);
 	}
 
 	@Test
-	void exportTickets_rejectsMissingProject() {
-		assertThatThrownBy(() -> ticketCsvService.exportTickets(999L))
-				.isInstanceOf(ResourceNotFoundException.class);
+	void importTickets_handlesQuotedCommasAndQuotes() {
+		String csv = "title,description,status,priority,type,assigneeId\n"
+				+ "\"Title, with comma\",\"Desc \"\"quoted\"\"\",TODO,MEDIUM,TECHNICAL,\n";
+
+		var result = ticketCsvService.importTickets(projectId, csvFile(csv), ownerId);
+
+		assertThat(result.getCreated()).isEqualTo(1);
+		var imported = ticketRepository.findByProjectIdAndDeletedAtIsNull(projectId).stream()
+				.filter(ticket -> ticket.getTitle().contains("comma"))
+				.findFirst()
+				.orElseThrow();
+		assertThat(imported.getDescription()).isEqualTo("Desc \"quoted\"");
 	}
 
 	@Test
-	void exportTickets_rejectsSoftDeletedProject() {
-		Project project = projectRepository.findById(projectId).orElseThrow();
-		project.setDeletedAt(Instant.now());
-		projectRepository.save(project);
+	void importTickets_reportsInvalidRowsWithoutStopping() {
+		String csv =
+				"""
+				title,description,status,priority,type,assigneeId
+				Valid task,,,MEDIUM,TECHNICAL,
+				,Missing title,,MEDIUM,TECHNICAL,
+				Bad priority,,,URGENT,TECHNICAL,
+				""";
 
-		assertThatThrownBy(() -> ticketCsvService.exportTickets(projectId))
+		var result = ticketCsvService.importTickets(projectId, csvFile(csv), ownerId);
+
+		assertThat(result.getCreated()).isEqualTo(1);
+		assertThat(result.getFailed()).isEqualTo(2);
+		assertThat(result.getErrors()).hasSize(2);
+	}
+
+	@Test
+	void importTickets_rejectsNonCsvFile() {
+		MockMultipartFile file =
+				new MockMultipartFile("file", "data.json", "application/json", "{}".getBytes());
+
+		assertThatThrownBy(() -> ticketCsvService.importTickets(projectId, file, ownerId))
+				.isInstanceOf(BusinessRuleException.class)
+				.hasMessageContaining("CSV");
+	}
+
+	@Test
+	void importTickets_rejectsMissingProject() {
+		assertThatThrownBy(() -> ticketCsvService.importTickets(999L, csvFile(minimalCsv()), ownerId))
 				.isInstanceOf(ResourceNotFoundException.class);
+	}
+
+	private MockMultipartFile csvFile(String content) {
+		return new MockMultipartFile(
+				"file", "tickets.csv", "text/csv", content.getBytes(StandardCharsets.UTF_8));
+	}
+
+	private String minimalCsv() {
+		return """
+				title,description,status,priority,type,assigneeId
+				Imported only,,,MEDIUM,TECHNICAL,
+				""";
 	}
 
 	private Ticket saveTicket(
