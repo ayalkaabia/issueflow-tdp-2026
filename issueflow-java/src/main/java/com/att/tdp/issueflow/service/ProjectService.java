@@ -10,6 +10,7 @@ import com.att.tdp.issueflow.model.entity.Project;
 import com.att.tdp.issueflow.model.enums.AuditAction;
 import com.att.tdp.issueflow.model.enums.AuditActor;
 import com.att.tdp.issueflow.model.enums.AuditEntityType;
+import com.att.tdp.issueflow.model.enums.Role;
 import com.att.tdp.issueflow.repository.ProjectRepository;
 import com.att.tdp.issueflow.repository.UserRepository;
 import java.time.Instant;
@@ -84,6 +85,28 @@ public class ProjectService {
 				AuditAction.DELETE, AuditEntityType.PROJECT, projectId, performedBy, AuditActor.USER);
 	}
 
+	@Transactional(readOnly = true)
+	public List<ProjectResponse> getDeletedProjects(Long performedBy) {
+		requireAdmin(performedBy);
+		return projectRepository.findByDeletedAtIsNotNull().stream()
+				.map(ProjectMapper::toResponse)
+				.toList();
+	}
+
+	@Transactional
+	public void restoreProject(Long projectId, Long performedBy) {
+		requireAdmin(performedBy);
+
+		Project project = projectRepository
+				.findByIdAndDeletedAtIsNotNull(projectId)
+				.orElseThrow(() -> new ResourceNotFoundException("Deleted project not found: " + projectId));
+
+		project.setDeletedAt(null);
+		Project saved = projectRepository.save(project);
+		auditService.log(
+				AuditAction.RESTORE, AuditEntityType.PROJECT, saved.getId(), performedBy, AuditActor.USER);
+	}
+
 	private Project requireActiveProject(Long projectId) {
 		return projectRepository
 				.findByIdAndDeletedAtIsNull(projectId)
@@ -94,5 +117,15 @@ public class ProjectService {
 		userRepository
 				.findById(userId)
 				.orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+	}
+
+	private void requireAdmin(Long performedBy) {
+		var user = userRepository
+				.findById(performedBy)
+				.orElseThrow(() -> new ResourceNotFoundException("User not found: " + performedBy));
+		if (user.getRole() != Role.ADMIN) {
+			throw new BusinessRuleException(
+					"Only ADMIN users can access deleted projects or restore them");
+		}
 	}
 }

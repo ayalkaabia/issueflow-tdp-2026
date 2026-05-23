@@ -63,6 +63,14 @@ class SecurityIntegrationTest {
 	}
 
 	@Test
+	void adminOnlyEndpoint_allowsAdmin() throws Exception {
+		String token = login("admin");
+
+		mockMvc.perform(get("/projects/deleted").header("Authorization", "Bearer " + token))
+				.andExpect(status().isOk());
+	}
+
+	@Test
 	void login_allowsAccessWithDoubleBearerPrefix() throws Exception {
 		String token = login("dev");
 

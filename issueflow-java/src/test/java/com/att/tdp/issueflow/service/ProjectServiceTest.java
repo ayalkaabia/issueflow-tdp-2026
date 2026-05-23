@@ -76,8 +76,40 @@ class ProjectServiceTest {
 		projectService.softDeleteProject(created.getId(), ownerId);
 
 		assertThat(projectService.getAllProjects()).isEmpty();
-		assertThatThrownBy(() -> projectService.getProjectById(created.getId()))
-				.isInstanceOf(ResourceNotFoundException.class);
+		assertThat(projectService.getDeletedProjects(ownerId)).hasSize(1);
+	}
+
+	@Test
+	void restoreProject_bringsBackActive() {
+		var created = projectService.createProject(createRequest("Sample Project"), ownerId);
+		projectService.softDeleteProject(created.getId(), ownerId);
+
+		projectService.restoreProject(created.getId(), ownerId);
+
+		assertThat(projectService.getAllProjects()).hasSize(1);
+		assertThat(projectService.getProjectById(created.getId()).getName()).isEqualTo("Sample Project");
+	}
+
+	@Test
+	void getDeletedProjects_rejectsNonAdmin() {
+		Long devId = saveDeveloper("dev").getId();
+		var created = projectService.createProject(createRequest("Sample Project"), ownerId);
+		projectService.softDeleteProject(created.getId(), ownerId);
+
+		assertThatThrownBy(() -> projectService.getDeletedProjects(devId))
+				.isInstanceOf(BusinessRuleException.class)
+				.hasMessageContaining("ADMIN");
+	}
+
+	@Test
+	void restoreProject_rejectsNonAdmin() {
+		Long devId = saveDeveloper("dev").getId();
+		var created = projectService.createProject(createRequest("Sample Project"), ownerId);
+		projectService.softDeleteProject(created.getId(), ownerId);
+
+		assertThatThrownBy(() -> projectService.restoreProject(created.getId(), devId))
+				.isInstanceOf(BusinessRuleException.class)
+				.hasMessageContaining("ADMIN");
 	}
 
 	@Test
@@ -95,6 +127,16 @@ class ProjectServiceTest {
 
 		assertThatThrownBy(() -> projectService.updateProject(created.getId(), new UpdateProjectRequest(), ownerId))
 				.isInstanceOf(BusinessRuleException.class);
+	}
+
+	private User saveDeveloper(String username) {
+		User dev = new User();
+		dev.setUsername(username);
+		dev.setEmail(username + "@example.com");
+		dev.setFullName("Developer");
+		dev.setRole(Role.DEVELOPER);
+		dev.setPasswordHash(TestPasswords.encoded());
+		return userRepository.save(dev);
 	}
 
 	private CreateProjectRequest createRequest(String name) {

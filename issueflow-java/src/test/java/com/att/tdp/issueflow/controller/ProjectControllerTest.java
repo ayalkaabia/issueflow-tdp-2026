@@ -92,6 +92,26 @@ class ProjectControllerTest extends SecuredControllerTestBase {
 		verify(projectService).softDeleteProject(eq(1L), eq(1L));
 	}
 
+	@Test
+	void getDeletedProjects_usesCorrectPath() throws Exception {
+		when(projectService.getDeletedProjects(1L)).thenReturn(List.of(sampleProject()));
+
+		mockMvc.perform(get("/projects/deleted"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$[0].id").value(1));
+
+		verify(projectService).getDeletedProjects(1L);
+	}
+
+	@Test
+	void restoreProject_usesCorrectPath() throws Exception {
+		doNothing().when(projectService).restoreProject(eq(1L), eq(1L));
+
+		mockMvc.perform(post("/projects/1/restore")).andExpect(status().isOk());
+
+		verify(projectService).restoreProject(eq(1L), eq(1L));
+	}
+
 	private ProjectResponse sampleProject() {
 		return ProjectResponse.builder()
 				.id(1L)

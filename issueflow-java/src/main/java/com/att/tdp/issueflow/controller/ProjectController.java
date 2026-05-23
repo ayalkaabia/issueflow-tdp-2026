@@ -32,6 +32,11 @@ public class ProjectController {
 		return projectService.getAllProjects();
 	}
 
+	@GetMapping("/deleted")
+	public List<ProjectResponse> getDeletedProjects() {
+		return projectService.getDeletedProjects(SecurityUtils.getCurrentUserId());
+	}
+
 	@GetMapping("/{projectId}")
 	public ProjectResponse getProjectById(@PathVariable Long projectId) {
 		return projectService.getProjectById(projectId);
@@ -51,6 +56,12 @@ public class ProjectController {
 	@DeleteMapping("/{projectId}")
 	public ResponseEntity<Void> softDeleteProject(@PathVariable Long projectId) {
 		projectService.softDeleteProject(projectId, SecurityUtils.getCurrentUserId());
+		return ResponseEntity.ok().build();
+	}
+
+	@PostMapping("/{projectId}/restore")
+	public ResponseEntity<Void> restoreProject(@PathVariable Long projectId) {
+		projectService.restoreProject(projectId, SecurityUtils.getCurrentUserId());
 		return ResponseEntity.ok().build();
 	}
 }
