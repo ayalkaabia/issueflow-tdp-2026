@@ -17,6 +17,7 @@ import com.att.tdp.issueflow.dto.response.TicketResponse;
 import com.att.tdp.issueflow.model.enums.TicketPriority;
 import com.att.tdp.issueflow.model.enums.TicketStatus;
 import com.att.tdp.issueflow.model.enums.TicketType;
+import com.att.tdp.issueflow.service.TicketCsvService;
 import com.att.tdp.issueflow.service.TicketService;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,22 @@ class TicketControllerTest extends SecuredControllerTestBase {
 
 	@MockitoBean
 	private TicketService ticketService;
+
+	@MockitoBean
+	private TicketCsvService ticketCsvService;
+
+	@Test
+	void exportTickets_returnsCsv() throws Exception {
+		when(ticketCsvService.exportTickets(1L)).thenReturn("id,title\n1,Task".getBytes());
+
+		mockMvc.perform(get("/tickets/export").param("projectId", "1"))
+				.andExpect(status().isOk())
+				.andExpect(
+						org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+								.string("Content-Disposition", "attachment; filename=\"tickets-1.csv\""));
+
+		verify(ticketCsvService).exportTickets(1L);
+	}
 
 	@Test
 	void getTicketsByProject_returnsList() throws Exception {
