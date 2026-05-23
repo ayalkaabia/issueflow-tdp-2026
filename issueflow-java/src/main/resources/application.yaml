@@ -24,6 +24,8 @@ spring:
       max-request-size: 10MB
 
 issueflow:
+  attachments:
+    upload-dir: uploads
   jwt:
     secret: issueflow-dev-secret-change-in-production-min-32-chars-long
     expiration-seconds: 3600
