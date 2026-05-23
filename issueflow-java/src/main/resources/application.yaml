@@ -24,6 +24,9 @@ spring:
       max-request-size: 10MB
 
 issueflow:
+  escalation:
+    # Scheduler interval for overdue-ticket priority escalation (milliseconds)
+    fixed-delay-ms: 60000
   attachments:
     upload-dir: uploads
   jwt:
